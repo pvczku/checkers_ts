@@ -7,7 +7,7 @@ export default class Game {
   board: Board;
 
   showLegalMoves:
-    | ((x: number, y: number) => { x: number; y: number }[])
+    | ((x: number, y: number) => void)
     | null = null;
   playMove:
     | ((from: { x: number; y: number }, to: { x: number; y: number }) => void)
@@ -25,23 +25,27 @@ export default class Game {
     this.board = new Board(this.scene.scene);
 
     window.onclick = (e) => {
-      this.board.hideLegalMoves();
-      const object = this.raycaster.handleClick(e);
-      if (!object) return;
-
-      if (object.name === "Pawn" && object.userData.color === this.color) {
-        this.selectedPawn = object;
+        const object = this.raycaster.handleClick(e);
+        if (!object) return;
+        
+        console.log(object.userData.available)
+        
+        if (object.name === "Pawn" && object.userData.color === this.color) {
+            
+            this.selectedPawn = object;
         const material = (object as THREE.Mesh)
           .material as THREE.MeshPhongMaterial;
         material.emissive.setHex(0xffff00);
-
         if (this.showLegalMoves) {
-          this.board.showLegalMoves(
-            object.userData.position,
-            this.showLegalMoves
-          );
+            this.showLegalMoves(object.userData.position.x, object.userData.position.y)
         }
-      } else if (object.name === "BoardPart") {
+      } else if (object.name === "BoardPart" && object.userData.available && this.selectedPawn) {
+        console.log("kutas")
+        if (this.playMove){
+            this.playMove(this.selectedPawn.userData.position, object.userData.position);
+        }
+        this.board.hideLegalMoves();
+        this.selectedPawn = null;
       }
     };
 
@@ -155,16 +159,52 @@ class Board extends THREE.Object3D {
     }
   }
 
-  movePawn(from: { x: number; y: number }, to: { x: number; y: number }) {}
+  movePawn(from: { x: number; y: number }, to: { x: number; y: number }) {
+    const pawn = this.children.find(
+        (child) =>
+            child.name === "Pawn" &&
+            child.userData.position.x === from.x &&
+            child.userData.position.y === from.y
+    ) as Pawn;
+    new TWEEN.Tween(pawn.position).to(
+      {
+        x: to.x,
+        y: 0.65,
+        z: to.y,
+      },
+      500
+    )
+    .easing(TWEEN.Easing.Quadratic.Out)
+    .start();
+    pawn.userData.position.x = to.x;
+    pawn.userData.position.y = to.y;
+  }
 
-  capturePawn(from: { x: number; y: number }) {}
+  capturePawn(from: { x: number; y: number }) {
+    console.log(from)
+    const pawn = this.children.find(
+        (child) =>
+            child.name === "Pawn" &&
+            child.userData.position.x === from.x &&
+            child.userData.position.y === from.y
+    ) as Pawn;
+    this.remove(pawn)
+  }
 
   showLegalMoves(
-    position: { x: number; y: number },
-    callback: (x: number, y: number) => { x: number; y: number }[]
+    legalMoves: { x: number; y: number }[],
   ) {
-    const legalMoves = callback(position.x, position.y);
-    console.log(legalMoves);
+    const BoardParts = this.children.filter(
+        (child) => child.name === "BoardPart"
+    );
+    BoardParts.forEach((boardPart) => {
+        if (legalMoves.some((move) => move.x === boardPart.userData.position.x && move.y === boardPart.userData.position.y)) {
+            (
+            (boardPart as BoardPart).material as THREE.MeshPhongMaterial
+            ).emissive.set(0x00ff00);
+            boardPart.userData.available = true;
+        }
+        });
   }
 
   hideLegalMoves() {

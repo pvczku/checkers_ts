@@ -23,6 +23,11 @@ export default class UI {
     this.loginButton.onclick = () => {
       if (this.addUser) {
         this.addUser!(this.loginInput.value);
+        const waiting = document.createElement("div")
+        waiting.classList.add("waiting")
+        waiting.innerText = "Waiting for other player..."
+        document.body.appendChild(waiting)
+        document.querySelector("#app")!.remove()
       }
     };
   }
